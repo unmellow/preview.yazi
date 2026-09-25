@@ -1,48 +1,55 @@
 local M = {}
 
 function M:peek(job)
-	-- Get a designated cache path for this file from Yazi
-	local cache = ya.file_cache(job)
-	if not cache then
+	-- 1. Ignore directories
+	if job.file.cha.is_dir then
 		return
 	end
 
-	-- Generate thumbnail if it does not already exist in cache
+	-- 2. Obtain cache URL from Yazi
+	local cache = ya.file_cache(job)
+	if not cache then
+		return ya.preview_widgets(job, {
+			ui.Paragraph(job.area, {
+				ui.Line("Unable to allocate file cache for preview."),
+			}),
+		})
+	end
+
+	-- 3. If thumbnail already exists in cache, render it
 	local cha = fs.cha(cache)
-	if not cha or cha.len == 0 then
-		local child, err = Command("ffmpegthumbnailer")
-			:args({
-				"-i",
-				tostring(job.file.url),
-				"-o",
-				tostring(cache),
-				"-s",
-				"800",
-				"-q",
-				"6",
-			})
-			:spawn()
+	if cha and cha.len > 0 then
+		return ya.image_show(cache, job.area)
+	end
 
-		if not child then
-			return ya.preview_widgets(job, {
-				ui.Paragraph(job.area, {
-					ui.Line(string.format("Failed to spawn ffmpegthumbnailer: %s", tostring(err))),
-				}),
-			})
-		end
+	-- 4. Try generating video thumbnail via ffmpegthumbnailer
+	local child, err = Command("ffmpegthumbnailer")
+		:args({
+			"-i",
+			tostring(job.file.url),
+			"-o",
+			tostring(cache),
+			"-s",
+			"800",
+			"-q",
+			"6",
+		})
+		:spawn()
 
+	if child then
 		local status = child:wait()
-		if not status or not status:success() then
-			return ya.preview_widgets(job, {
-				ui.Paragraph(job.area, {
-					ui.Line("ffmpegthumbnailer failed to generate video thumbnail."),
-				}),
-			})
+		if status and status:success() then
+			return ya.image_show(cache, job.area)
 		end
 	end
 
-	-- Render the cached image directly into Yazi's preview pane
-	return ya.image_show(cache, job.area)
+	-- 5. Fallback for non-video files or failed thumbnails
+	local err_msg = err and tostring(err) or "No preview available for this file type."
+	return ya.preview_widgets(job, {
+		ui.Paragraph(job.area, {
+			ui.Line(err_msg),
+		}),
+	})
 end
 
 function M:seek(job)

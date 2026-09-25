@@ -1,0 +1,10 @@
+[package]
+id = "preview"
+name = "preview"
+version = "0.2.0"
+description = "Modern video and media previewer for Yazi"
+authors = ["YourName"]
+license = "MIT"
+
+[plugin]
+repository = "https://github.com/YOUR_USERNAME/preview.yazi"
